@@ -2,9 +2,7 @@ import altair as alt
 import crim_intervals as ci
 import pandas as pd
 
-def plot_ngrams_heatmap(mel_ngrams, patterns=[], voices=[]):
-
-    # TODO error, not work with harmonic or melodic
+def plot_ngrams_heatmap(model, mel_ngrams, patterns=[], voices=[]):
 
     """
     Allowing users to plot a heatmap with a the dataframe returned from getNgrams.
@@ -21,9 +19,13 @@ def plot_ngrams_heatmap(mel_ngrams, patterns=[], voices=[]):
     starts = []
     for i in range(num_voices):
         starts.extend(mel_ngrams.index.astype(float).tolist())
-    # TODO sometimes starts has patterns
     mel_ngrams_matches_df['start'] = starts
-    mel_ngrams_matches_df['end'] = mel_ngrams_matches_df['start'].shift(periods=-1)
+
+    durations = []
+    durations_df = model.getDuration(df=mel_ngrams)
+    for voice in voices:
+        durations.extend(durations_df[voice])
+    mel_ngrams_matches_df['end'] = mel_ngrams_matches_df['start'] + durations
     
     ngrams_patterns = [] # all the patterns that exist in the ngrams df
     for voice in voices:
@@ -40,11 +42,16 @@ def plot_ngrams_heatmap(mel_ngrams, patterns=[], voices=[]):
     
     # print(mel_ngrams_matches_df.dtypes)
 
+    selection = alt.selection_multi(fields=['pattern'], bind='legend')
+
     chart = alt.Chart(mel_ngrams_matches_df.dropna()).mark_bar().encode(
-    x='start',
-    x2='end',
-    y='voices',
-    color='pattern'
+        x='start',
+        x2='end',
+        y='voices',
+        color='pattern', 
+        opacity=alt.condition(selection, alt.value(1), alt.value(0.2))
+    ).add_selection(
+        selection
     )
     
-    return chart
+    return chart, mel_ngrams_matches_df
