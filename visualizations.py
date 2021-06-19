@@ -8,6 +8,8 @@ def plot_ngrams_heatmap(model, mel_ngrams, patterns=[], voices=[]):
     Allowing users to plot a heatmap with a the dataframe returned from getNgrams.
     The users can input a list of specific voices and/or patterns to plot a heatmap. 
     """
+
+    # TODO barplot interactive
         
     # retrieve voices and number of voices before modifying the df
     if not voices:
@@ -42,16 +44,36 @@ def plot_ngrams_heatmap(model, mel_ngrams, patterns=[], voices=[]):
     
     # print(mel_ngrams_matches_df.dtypes)
 
-    selection = alt.selection_multi(fields=['pattern'], bind='legend')
+    selection = alt.selection_multi(fields=['pattern'])
+    # brush = alt.selection(type='interval', encodings=['x'])
 
-    chart = alt.Chart(mel_ngrams_matches_df.dropna()).mark_bar().encode(
-        x='start',
-        x2='end',
-        y='voices',
-        color='pattern', 
+    chart1 = alt.Chart().mark_bar().encode(
+        x='pattern', 
+        y='count(pattern)',
+        color='pattern',        
         opacity=alt.condition(selection, alt.value(1), alt.value(0.2))
     ).add_selection(
         selection
     )
-    
+
+
+    chart2 = alt.Chart().mark_bar().encode(
+        x='start',
+        x2='end',
+        y='voices',
+        color='pattern', 
+    ).transform_filter(
+        selection
+    ).properties(
+        width=700,
+        height=250
+    )
+
+    chart = alt.vconcat(
+        chart1, chart2,
+        data=mel_ngrams_matches_df.dropna()
+    )
+
+
+
     return chart, mel_ngrams_matches_df
