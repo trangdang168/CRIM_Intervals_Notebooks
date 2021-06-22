@@ -16,37 +16,21 @@ def plot_ngrams_heatmap(model, mel_ngrams, patterns=[], voices=[]):
         voices = mel_ngrams.columns
     num_voices = len(voices)
     
-    mel_ngrams_matches_df = pd.DataFrame()
+    mel_ngrams_matches_df = mel_ngrams.copy()
+    mel_ngrams_matches_df.index.name = "start"
+    mel_ngrams_matches_df = mel_ngrams_matches_df.reset_index().melt(id_vars=["start"], value_name="pattern", var_name="voices")
 
-    starts = []
-    for i in range(num_voices):
-        starts.extend(mel_ngrams.index.astype(float).tolist())
-    mel_ngrams_matches_df['start'] = starts
-
-
-    durations = []
-    durations_df = model.getDuration(df=mel_ngrams)
-    for voice in voices:
-        durations.extend(durations_df[voice])
-    mel_ngrams_matches_df['end'] = mel_ngrams_matches_df['start'] + durations
-    
-    ngrams_patterns = [] # all the patterns that exist in the ngrams df
-    for voice in voices:
-        ngrams_patterns.extend(mel_ngrams[voice])
-    mel_ngrams_matches_df['pattern'] =  ngrams_patterns
-
-    voices_list = [] # store the list of voices to be added to the result df 
-    for voice in voices:
-        voices_list.extend([voice]*len(mel_ngrams))
-    mel_ngrams_matches_df['voices'] = voices_list
+    mel_ngrams_matches_df["start"] = mel_ngrams_matches_df["start"].astype(float)
+    # TODO durations fixed later
+    durations_df = model.getDuration(df=mel_ngrams_matches_df)
+    mel_ngrams_matches_df['end'] = mel_ngrams_matches_df['start'] + durations_df['pattern']
 
     if patterns:
         mel_ngrams_matches_df = mel_ngrams_matches_df[mel_ngrams_matches_df['pattern'].isin(patterns)]
     
-    print(mel_ngrams_matches_df)
+    # print(mel_ngrams_matches_df)
 
     observer_selection = alt.selection_multi(fields=['pattern'])
-    # brush = alt.observer_selection(type='interval', encodings=['x'])
 
     chart1 = alt.Chart().mark_bar().encode(
         y='pattern', 
@@ -56,7 +40,6 @@ def plot_ngrams_heatmap(model, mel_ngrams, patterns=[], voices=[]):
     ).add_selection(
         observer_selection
     )
-
 
     chart2 = alt.Chart().mark_bar().encode(
         x='start',
@@ -75,27 +58,31 @@ def plot_ngrams_heatmap(model, mel_ngrams, patterns=[], voices=[]):
         data=mel_ngrams_matches_df.dropna()
     )
 
-
-
     return chart, mel_ngrams_matches_df
 
-def plot_relationship_heatmap(relationship_df, piece_id, heat_map_width=800, heat_map_height=300):
+
+def plot_relationship_heatmap(relationship_df, heat_map_width=800, heat_map_height=300):
+
+    if len(relationship_df) == 0:
+        print("DataFrame is empty!")
+        return None, None
 
     # filter relationships from one piece
-    relationship_df = relationship_df[relationship_df['model_observation.piece.piece_id'] == piece_id]
-    relationship_df['location'] = relationship_df['model_observation.ema'].str.split("/", n=1, expand=True)[0]
-    relationship_df['location'] = relationship_df['location'].str.split(",")
-    relationship_df = relationship_df.explode('location')
-    relationship_df[['start', 'end']] = relationship_df['location'].str.split("-", expand=True).fillna(method='ffill', axis=1)
-    relationship_df['id'] = relationship_df['id'].astype(str)
-    relationship_df['start'] = relationship_df['start'].astype(int)
-    relationship_df['end'] = relationship_df['end'].astype(int)
+    ans_df = relationship_df.copy()
+    ans_df['location'] = ans_df['model_observation.ema'].str.split("/", n=1, expand=True).copy()[0]
+    ans_df['location'] = ans_df['location'].str.split(",")
+    ans_df = ans_df.explode('location')
+    # ffill to cover ema locations with only start points, and bfill to cover locations with only end points
+    ans_df[['start', 'end']] = ans_df['location'].str.split("-", expand=True).fillna(method='ffill', axis=1)
+    ans_df['id'] = ans_df['id'].astype(str)
+    ans_df['start'] = ans_df['start'].astype(int)
+    ans_df['end'] = ans_df['end'].astype(int)
 
     observer_selection = alt.selection_multi(fields=['observer.name'])
     type_selection = alt.selection_multi(fields=['relationship_type'])
 
     # plot observers count
-    observer_chart = alt.Chart(relationship_df).mark_bar().encode(
+    observer_chart = alt.Chart(ans_df).mark_bar().encode(
         y='observer.name', 
         x='count(observer.name)', 
         color='relationship_type',    
@@ -105,7 +92,7 @@ def plot_relationship_heatmap(relationship_df, piece_id, heat_map_width=800, hea
     )
     
     # plot relationship count bar plot
-    type_chart = alt.Chart(relationship_df).mark_bar().encode(
+    type_chart = alt.Chart(ans_df).mark_bar().encode(
         y='relationship_type', 
         x='count(relationship_type)',     
         color='relationship_type',  
@@ -115,7 +102,7 @@ def plot_relationship_heatmap(relationship_df, piece_id, heat_map_width=800, hea
     )
 
     # concat the above two
-    heatmap = alt.Chart(relationship_df).mark_bar().encode(
+    heatmap = alt.Chart(ans_df).mark_bar().encode(
         x='start',
         x2='end',
         y='id',
@@ -135,4 +122,4 @@ def plot_relationship_heatmap(relationship_df, piece_id, heat_map_width=800, hea
     )
 
     # plot the last gantt chart
-    return chart, relationship_df
+    return chart, ans_df
