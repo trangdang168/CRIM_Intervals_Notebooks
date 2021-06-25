@@ -28,7 +28,7 @@ def create_heatmap(x, x2, y, color, data, heat_map_width, heat_map_height, selec
 
     return heatmap
 
-def process_ngrams_df(ngrams_df, selected_pattern = [], voices = []):
+def process_ngrams_df(ngrams_df, model=None, selected_pattern = [], voices = []):
     """
     This method combines ngrams from all voices in different columns
     into one column and calculates the starts and end points of the
@@ -36,6 +36,8 @@ def process_ngrams_df(ngrams_df, selected_pattern = [], voices = []):
     for the users to analyze.
 
     :param ngrams_df: dataframe we got from getNgram in crim-interval
+    :param model: if not None, rely on the model to calculate the durations of patterns 
+    of just outputing only offsets (default=False).
     :param selected_pattern: list of specific patterns the users want (optional)
     :param voices: list of specific voices the users want (optional)
     :return: a processed dataframe with only desired patterns from desired voices
@@ -47,30 +49,33 @@ def process_ngrams_df(ngrams_df, selected_pattern = [], voices = []):
 
     # add a start column containing offsets
     ngrams_df.index.name = "start"
-    ngrams_df = ngrams_df.reset_index().melt(id_vars=["start"], value_name="pattern", var_name="voices")
+    ngrams_df = ngrams_df.reset_index().melt(id_vars=["start"], value_name="pattern", var_name="voice")
 
     ngrams_df["start"] = ngrams_df["start"].astype(float)
 
     # TODO add durations when getDuration is fixed
-    # durations_df = model.getDuration(df=ngrams_df)
-    # currently, make end=start+1 just to display offsets
-    ngrams_df['end'] = ngrams_df['start'] + 1
+    if model:
+        durations_df = model.getDuration(df=ngrams_df)
+        ngrams_df['end'] = ngrams_df['start'] + durations_df['pattern']
+    else:
+        # currently, make end=start+1 just to display offsets
+        ngrams_df['end'] = ngrams_df['start'] + 1
 
-    # filter according to voices and patterns
+    # filter according to voices and patterns (after computing durations for correct offsets)
     if voices:
-        voice_condition = ngrams_df.isin(voices)
+        voice_condition = ngrams_df['voice'].isin(voices)
         ngrams_df = ngrams_df[voice_condition].dropna(how='all')
     
     if selected_pattern:
-        pattern_condition = ngrams_df.isin(selected_pattern)
+        pattern_condition = ngrams_df['pattern'].isin(selected_pattern)
         ngrams_df = ngrams_df[pattern_condition].dropna(how='all')
 
     return ngrams_df
 
-def plot_ngrams_heatmap(ngrams_df, selected_pattern = [], voices = [], heatmap_width=800, heatmap_height=300):
+def plot_ngrams_df_heatmap(processed_ngrams_df, selected_pattern = [], voices = [], heatmap_width=800, heatmap_height=300):
     """
     Plot a heatmap for crim-intervals getNgram's output.
-    :param ngrams_df: crim-intervals getNgram's output.
+    :param ngrams_df: processed crim-intervals getNgram's output.
     :param selected_pattern: list of specific patterns the users want (optional)
     :param voices: list of specific voices the users want (optional)
     :param heatmap_width: the width of the final heatmap (optional)
@@ -78,15 +83,20 @@ def plot_ngrams_heatmap(ngrams_df, selected_pattern = [], voices = [], heatmap_w
     :return: a bar chart that displays the different patterns and their counts,
     and a heatmap with the start offsets of chosen voices / patterns
     """
-    ngrams_df = process_ngrams_df(ngrams_df, selected_pattern, voices)
-    ngrams_df = ngrams_df.dropna(how='any')
+
+    processed_ngrams_df = processed_ngrams_df.dropna(how='any')
     
     selector = alt.selection_multi(fields=['pattern'])
     patterns_bar = create_bar_chart('pattern', 'count(pattern)', 'pattern', \
-                                    ngrams_df, selector, selector)
-    heatmap = create_heatmap('start', 'end', 'voices', 'pattern', ngrams_df,\
+                                    processed_ngrams_df, selector, selector)
+    heatmap = create_heatmap('start', 'end', 'voice', 'pattern', processed_ngrams_df,\
                              heatmap_width, heatmap_height, selector, selector)
-    return alt.vconcat(patterns_bar, heatmap)
+    return alt.vconcat(patterns_bar, heatmap), processed_ngrams_df
+
+def plot_ngrams_heatmap(ngrams_df, model=None, selected_pattern = [], voices = [], heatmap_width=800, heatmap_height=300):
+    processed_ngrams_df = process_ngrams_df(ngrams_df, model=None, selected_pattern=selected_pattern, voices=voices)
+    return plot_ngrams_df_heatmap(processed_ngrams_df, selected_pattern = selected_pattern, voices = voices, \
+                            heatmap_width=heatmap_width, heatmap_height=heatmap_height)
 
 def from_ema_to_offsets(df, ema_column):
     """

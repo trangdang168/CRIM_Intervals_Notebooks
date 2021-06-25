@@ -4,6 +4,8 @@ import pandas as pd
 
 # TODO pandas training https://youtube.com/playlist?list=PL5-da3qGB5ICCsgW1MxlZ0Hq8LL5U3u9y
 
+# TODO users choosing tables of scores to give patterns 
+
 def plot_ngrams_heatmap(model, mel_ngrams, patterns=[], voices=[]):
 
     """
