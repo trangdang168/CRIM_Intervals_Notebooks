@@ -2,7 +2,7 @@ import requests
 import pandas as pd
 from pandas.io.json import json_normalize
 import altair as alt # visualization library; see https://altair-viz.github.io/
-import visualizations as viz
+import old_visualizations as viz
 
 data_relationships = requests.get('http://crimproject.org/data/relationships/').json()
 #df = pd.DataFrame(data)

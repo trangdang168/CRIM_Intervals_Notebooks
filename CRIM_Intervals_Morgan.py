@@ -18,7 +18,7 @@ from main import *
 import re
 # from crim_intervals import *
 import pandas as pd
-import visualizations as viz
+import old_visualizations as viz
 
 """
 # ## Load MEI Files from CRIM or Github by pasting one or more of [these links](https://docs.google.com/spreadsheets/d/1TzRqnzgcYYuQqZR78c5nizIsBWp4pnblm2wbU03uuSQ/edit?auth_email=rfreedma@haverford.edu#gid=0) below.
