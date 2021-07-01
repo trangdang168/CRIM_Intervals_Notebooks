@@ -140,20 +140,18 @@ def from_ema_to_offsets(df, ema_column):
     return df
 
 
-def plot_relationship_heatmap(df, ema_col, category1='musical_type', category0='observer.name', option=1, heat_map_width=800,
-                              heat_map_height=300):
+def plot_relationship_heatmap(df, ema_col, main_category='musical_type', other_category='observer.name', option=1,
+                              heat_map_width=800, heat_map_height=300):
     """
     This method plots a chart relationships/observations dataframe retrieved from their
     corresponding json files. This chart has two bar charts displaying the count of variables
     the users selected, and a heatmap displaying the locations of the relationship.
     :param df: relationships or observations dataframe
     :param ema_col: name of the ema column
-    :param category1: name of the first category for the first bar chart.
-    (default='musical_type')
-    :param category0: name of the zeroth category for the zeroth bar chart.
+    :param main_category: name of the main category for the first bar chart.
+    The chart would be colored accordingly (default='musical_type').
+    :param other_category: name of the other category for the zeroth bar chart.
     (default='observer.name')
-    :param option: if 0, the charts would be colored based on category0,
-    if 1, all of the charts would be colored based on category1. (default=1)
     :param heat_map_width: the width of the final heatmap (default=800)
     :param heat_map_height: the height of the final heatmap (default =300)
     :return: a big chart containing two smaller bar chart and a heatmap
@@ -172,33 +170,26 @@ def plot_relationship_heatmap(df, ema_col, category1='musical_type', category0='
     # because altair doesn't work when the categories' names have periods,
     # a period is replaced with a hyphen.
 
-    new_category0 = category0.replace(".", "_")
-    new_category1 = category1.replace(".", "_")
+    new_other_category = other_category.replace(".", "_")
+    new_main_category = main_category.replace(".", "_")
 
-    df.rename(columns={category0: new_category0, category1:new_category1}, inplace=True)
+    df.rename(columns={other_category: new_other_category, main_category:new_main_category}, inplace=True)
 
-    selector1 = alt.selection_multi(fields=[new_category0])
-    selector0 = alt.selection_multi(fields=[new_category1])
+    other_selector = alt.selection_multi(fields=[new_other_category])
+    main_selector = alt.selection_multi(fields=[new_main_category])
 
-    category0 = new_category0
-    category1 = new_category1
+    other_category = new_other_category
+    main_category = new_main_category
 
-    if option:
-        color = category1
-        main_selector = selector1
-    else:
-        color = category0
-        main_selector = selector0
+    bar1 = create_bar_chart(main_category, str('count(' + main_category + ')'), \
+                            main_category, df, other_selector | main_selector, main_selector)
+    bar0 = create_bar_chart(other_category, str('count(' + other_category + ')'), \
+                            main_category, df, other_selector | main_selector, other_selector)
 
-    bar1 = create_bar_chart(category1, str('count(' + category1 + ')'), \
-                               color, df, selector1 | selector0, selector0)
-    bar0 = create_bar_chart(category0, str('count(' + category0 + ')'), \
-                                color, df, selector1 | selector0, selector1)
-
-    heatmap = create_heatmap('start', 'end', 'id', color, df, heat_map_width,
-                             heat_map_height, selector1 | selector0, main_selector,
+    heatmap = create_heatmap('start', 'end', 'id', main_category, df, heat_map_width,
+                             heat_map_height, other_selector | main_selector, main_selector,
                              tooltip=[
-                                 'url', category1, category0,
+                                 'url', main_category, other_category,
                                  'start', 'end', 'id'
                              ]).interactive()
 
