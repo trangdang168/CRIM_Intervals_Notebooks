@@ -1,4 +1,7 @@
 import altair as alt
+from pyvis.network import Network
+import pandas as pd
+import re
 import textdistance
 
 def create_bar_chart(y, x, color, data, condition, *selectors):
@@ -251,4 +254,58 @@ def plot_close_match_heatmap(ngrams_df, key_pattern, ngrams_duration=None, selec
                           alt.datum.score > selector.cutoff, selector, tooltip=[])
 
 
+# create graph
+def plot_musical_type_network(df, musical_type, pieces=None):
+    """
+    Two options: fuga and pen
+    can filter by pieces
+    return a complete network and a df with which
+    the user can search through
+    """
+    net = Network(directed=True, notebook=True)
+    if pieces:
+        # filter df by pieces
+        pass
+    if musical_type=='fuga':
+        add_nodes_to_net(net, df['mt_fg_int'])
+        result_df = process_network_df(df, 'mt_fg_int',
+                                       'ema')
+    else: #musical_type=='pen'
+        add_nodes_to_net(net, df['mt_pen_int'])
+        result_df = process_network_df(df, 'mt_pen_int',
+                                       'ema')
+    return net, result_df
 
+# add nodes to graph
+def add_nodes_to_net(net, melodic_interval_column):
+    melodic_interval_column = melodic_interval_column.astype(str)
+    net.add_node('start', color='red', shape='circle')
+    # create nodes from the patterns
+    for node in melodic_interval_column:
+        nodes = re.sub(r'([+-])(?!$)', r'\1,', node).split(",")
+        group = nodes[0]
+        prev_node = 'start'
+
+        for i in range(1, len(nodes)):
+            node_id = "".join(node for node in nodes[:i])
+            net.add_node(node_id, group=group, physics=False)
+            net.add_edge(prev_node, node_id)
+            prev_node = node_id
+
+def process_network_df(df, melodic_interval_column_name, ema_column_name):
+    result_df = pd.DataFrame()
+    result_df[['piece.piece_id', 'url', melodic_interval_column_name]] = \
+        df[['piece.piece_id', 'url', melodic_interval_column_name]].copy()
+    result_df[['segments']] = \
+        df[ema_column_name].astype(str).str.split("/", 1, expand=True)[0]
+    result_df['segments'] = result_df['segments'].str.split(",")
+    return result_df
+
+def manipulate_network_df(df, search_pattern, pattern_column='mt_fg_int', search_option='starts with'):
+    if search_option == 'starts with':
+        search_pattern = '^' + search_pattern
+    elif search_option == 'ends with':
+        search_pattern = search_pattern + '$'
+    mask = df[pattern_column].apply(lambda x: x.astype(str).str.contains(pat=search_pattern, regex=True).any(), axis=1)
+    filtered_df = df[pattern_column][mask].copy()
+    return filtered_df.fillna("-").style.applymap(lambda x: "background: #ccebc5" if search_pattern in x else "")
