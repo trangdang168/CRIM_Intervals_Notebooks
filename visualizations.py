@@ -4,6 +4,7 @@ This script contains the method
 
 import altair as alt
 from pyvis.network import Network
+from ipywidgets import interact, fixed
 import pandas as pd
 import re
 import textdistance
@@ -290,63 +291,93 @@ def plot_close_match_heatmap(ngrams_df, key_pattern, ngrams_duration=None, selec
                           alt.datum.score > selector.cutoff, selector, tooltip=[])
 
 # Network visualizations
-def process_network_df(df, melodic_interval_column_name, ema_column_name):
+def process_network_df(df, interval_column_name, ema_column_name):
     """
     Create a small dataframe containing network
     """
     result_df = pd.DataFrame()
-    result_df[['piece.piece_id', 'url', melodic_interval_column_name]] = \
-        df[['piece.piece_id', 'url', melodic_interval_column_name]].copy()
+    result_df[['piece.piece_id', 'url', interval_column_name]] = \
+        df[['piece.piece_id', 'url', interval_column_name]].copy()
     result_df[['segments']] = \
         df[ema_column_name].astype(str).str.split("/", 1, expand=True)[0]
     result_df['segments'] = result_df['segments'].str.split(",")
     return result_df
 
 # add nodes to graph
-def add_nodes_to_net(net, melodic_interval_column):
-    melodic_interval_column = melodic_interval_column.astype(str)
-    net.add_node('start', color='red', shape='circle', level=0)
-    # create nodes from the patterns
-    for node in melodic_interval_column:
-        nodes = re.sub(r'([+-])(?!$)', r'\1,', node).split(",")
-        group = nodes[0]
-        prev_node = 'start'
+def add_nodes_to_net(interval_column, interval_type):
+    # dictionary maps the first time/melodic interval to its corresponding
+    # network
+    networks_dict = {'all': Network(directed=True, notebook=True)}
+    interval_column = interval_column.astype(str)
+    networks_dict['all'].add_node('all', color='red', shape='circle', level=0)
 
+    # create nodes from the patterns
+    for node in interval_column:
+        # create nodes according to the interval types
+        if interval_type == 'melodic':
+            nodes = re.sub(r'([+-])(?!$)', r'\1,', node).split(",")
+        elif interval_type == 'time':
+            nodes = node.split("/")
+        else:
+            raise Exception("Please put either 'time' or 'melodic' for `type_interval`")
+
+        # nodes would be grouped according to the first interval
+        group = nodes[0]
+
+        if not group in networks_dict:
+            networks_dict[group] = Network(directed=True, notebook=True)
+
+        prev_node = 'all'
         for i in range(1, len(nodes)):
             node_id = "".join(node for node in nodes[:i])
-            net.add_node(node_id, group=group, physics=False, level=i)
-            net.add_edge(prev_node, node_id)
+            # add to its own family network
+            networks_dict[group].add_node(node_id, group=group, physics=False, level=i)
+            if prev_node != "all":
+                networks_dict[group].add_edge(prev_node, node_id)
+
+            # add to the big network
+            networks_dict['all'].add_node(node_id, group=group, physics=False, level=i)
+            networks_dict['all'].add_edge(prev_node, node_id)
             prev_node = node_id
 
-# create graph
-def plot_musical_type_network(df, musical_type, pieces=None):
-    """
-    Two options: fuga and pen
-    can filter by pieces
-    return a complete network and a df with which
-    the user can search through
-    """
-    net = Network(directed=True, notebook=True, width=700, height=1000, layout=True)
-    if pieces:
-        # filter df by pieces
-        pass
-    if musical_type=='fuga':
-        add_nodes_to_net(net, df['mt_fg_int'])
-        result_df = process_network_df(df, 'mt_fg_int',
-                                       'ema')
-    else: #musical_type=='pen'
-        add_nodes_to_net(net, df['mt_pe_int'])
-        result_df = process_network_df(df, 'mt_pe_int',
-                                       'ema')
-    return net, result_df
+    return networks_dict
 
-# # TODO rename column, add dataframe arguments, manipulation method
-# def manipulate_network_df(search_pattern, option='starts with', df):
-#     if option=='starts with':
-#         mask = df['mt_pe_int'].astype(str).str.startswith(pat=search_pattern)
-#     elif option=='ends with':
-#         mask = df['mt_pe_int'].astype(str).str.endswith(pat=search_pattern)
-#     else:
-#         mask = df['mt_pe_int'].astype(str).str.contains(pat=search_pattern, regex=False)
-#     filtered_df = df[mask].copy()
-#     return filtered_df.fillna("-").style.applymap(lambda x: "background: #ccebc5" if search_pattern in x else "")
+def generate_network(df, interval_column, interval_type, ema_column, patterns=[]):
+    """
+    Generate a dictionary of networks and a simple dataframe allowing the users
+    search through the intervals.
+    :param df:
+    :param interval_column:
+    :param interval_type:
+    :param ema_column:
+    :param patterns:
+    :return:
+    """
+    # process df
+    if patterns:
+        df = df[df[interval_column.isin(patterns)]].copy()
+
+    networks_dict = add_nodes_to_net(df[interval_column], interval_type)
+    df = process_network_df(df, interval_column, ema_column)
+    return networks_dict, create_interactive_df(df, interval_column)
+
+def manipulate_processed_network_df(df, interval_column, search_pattern, option='starts with'):
+    """
+
+    :param df:
+    :param interval_column:
+    :param search_pattern:
+    :param option:
+    :return:
+    """
+    if option == 'starts with':
+        mask = df[interval_column].astype(str).str.startswith(pat=search_pattern)
+    elif option == 'ends with':
+        mask = df[interval_column].astype(str).str.endswith(pat=search_pattern)
+    else:
+        mask = df[interval_column].astype(str).str.contains(pat=search_pattern, regex=False)
+    filtered_df = df[mask].copy()
+    return filtered_df.fillna("-").style.applymap(lambda x: "background: #ccebc5" if search_pattern in x else "")
+
+def create_interactive_df(df, interval_column):
+    return interact(manipulate_processed_network_df, df=fixed(df), interval_column=fixed(interval_column), search_pattern='', options=['starts with', 'contains', 'ends_with'])
