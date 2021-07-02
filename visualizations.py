@@ -1,3 +1,7 @@
+"""
+This script contains the method
+"""
+
 import altair as alt
 from pyvis.network import Network
 import pandas as pd
@@ -33,7 +37,17 @@ def create_heatmap(x, x2, y, color, data, heat_map_width, heat_map_height, selec
 
     return heatmap
 
-def process_ngrams_df_helper(ngrams_df, main_col):
+def _process_ngrams_df_helper(ngrams_df, main_col):
+    """
+    The output from the getNgram is usually a table with
+    four voices and ngram of notes properties (duration or
+    pitch). This method stack this property onto one column
+    and mark which voices they are from.
+    :param ngrams_df: direct output from getNgram with 1 columns
+    for each voices and ngrams of notes' properties.
+    :param main_col: the name of the property
+    :return: a dataframe with ['start', main_col, 'voice'] as columns
+    """
     # copy to avoid changing original ngrams df
     ngrams_df = ngrams_df.copy()
 
@@ -57,15 +71,15 @@ def process_ngrams_df(ngrams_df, ngrams_duration=None, selected_pattern=None, vo
     the durations.
     :param selected_pattern: list of specific patterns the users want (optional)
     :param voices: list of specific voices the users want (optional)
-    :return: a processed dataframe with only desired patterns from desired voices
+    :return a new, processed dataframe with only desired patterns from desired voices
     combined into one column with start and end points
     """
 
     # copy to avoid changing original ngrams df
-    ngrams_df = process_ngrams_df_helper(ngrams_df, 'pattern')
+    ngrams_df = _process_ngrams_df_helper(ngrams_df, 'pattern')
 
     if ngrams_duration is not None:
-        ngrams_duration = process_ngrams_df_helper(ngrams_duration, 'duration')
+        ngrams_duration = _process_ngrams_df_helper(ngrams_duration, 'duration')
         ngrams_df['end'] = ngrams_df['start'] + ngrams_duration['duration']
     else:
         # make end=start+1 just to display offsets
@@ -84,7 +98,7 @@ def process_ngrams_df(ngrams_df, ngrams_duration=None, selected_pattern=None, vo
 
 def plot_ngrams_df_heatmap(processed_ngrams_df, heatmap_width=800, heatmap_height=300):
     """
-    Plot a heatmap for crim-intervals getNgram's output.
+    Plot a heatmap for crim-intervals getNgram's processed output.
     :param ngrams_df: processed crim-intervals getNgram's output.
     :param selected_pattern: list of specific patterns the users want (optional)
     :param voices: list of specific voices the users want (optional)
@@ -97,10 +111,9 @@ def plot_ngrams_df_heatmap(processed_ngrams_df, heatmap_width=800, heatmap_heigh
     processed_ngrams_df = processed_ngrams_df.dropna(how='any')
     
     selector = alt.selection_multi(fields=['pattern'])
-    patterns_bar = create_bar_chart('pattern', 'count(pattern)', 'pattern', \
-                                    processed_ngrams_df, selector, selector)
+    patterns_bar = create_bar_chart('pattern', 'count(pattern)', 'pattern', processed_ngrams_df, selector, selector)
     heatmap = create_heatmap('start', 'end', 'voice', 'pattern', processed_ngrams_df, heatmap_width, heatmap_height,
-                             selector, selector, tooltip=[])
+                             selector, selector, tooltip=['start', 'end', 'pattern'])
     return alt.vconcat(patterns_bar, heatmap)
 
 def plot_ngrams_heatmap(ngrams_df, model=None, selected_pattern = [], voices = [],
@@ -119,9 +132,10 @@ def plot_ngrams_heatmap(ngrams_df, model=None, selected_pattern = [], voices = [
     """
     processed_ngrams_df = process_ngrams_df(ngrams_df, ngrams_duration=model, selected_pattern=selected_pattern,
                                             voices=voices)
-    return plot_ngrams_df_heatmap(processed_ngrams_df, heatmap_width=heatmap_width, heatmap_height=heatmap_height)
+    return plot_ngrams_df_heatmap(processed_ngrams_df, heatmap_width=heatmap_width,
+                                  heatmap_height=heatmap_height)
 
-def from_ema_to_offsets(df, ema_column):
+def _from_ema_to_offsets(df, ema_column):
     """
     This method adds a columns of start and end measure of patterns into
     the relationship dataframe using the column with the ema address.
@@ -142,7 +156,13 @@ def from_ema_to_offsets(df, ema_column):
     df['end'] = df['end'].astype(float)
     return df
 
+def _process_crim_json_url(url_column):
+    # remove 'data' from http://crimproject.org/data/observations/1/ or http://crimproject.org/data/relationships/5/
+    url_column = url_column.map(lambda cell: cell.replace('data/', ''))
+    return url_column
 
+# TODO refactor with a name that is applicable to both relationship
+# TODO and observations.
 def plot_relationship_heatmap(df, ema_col, main_category='musical_type', other_category='observer.name', option=1,
                               heat_map_width=800, heat_map_height=300):
     """
@@ -161,12 +181,13 @@ def plot_relationship_heatmap(df, ema_col, main_category='musical_type', other_c
     """
 
     df = df.copy()  # create a deep copy of the selected observations to protect the original dataframe
-    df = from_ema_to_offsets(df, ema_col)
+    df = _from_ema_to_offsets(df, ema_col)
 
     # sort by id
-    df.sort_values(by='id', inplace=True)
+    df.sort_values(by=main_category, inplace=True)
 
-    df = from_ema_to_offsets(df, ema_col)
+    df = _from_ema_to_offsets(df, ema_col)
+    df['website_url'] = _process_crim_json_url(df['url'])
 
     df['id'] = df['id'].astype(str)
 
@@ -184,17 +205,29 @@ def plot_relationship_heatmap(df, ema_col, main_category='musical_type', other_c
     other_category = new_other_category
     main_category = new_main_category
 
-    bar1 = create_bar_chart(main_category, str('count(' + main_category + ')'), \
-                            main_category, df, other_selector | main_selector, main_selector)
-    bar0 = create_bar_chart(other_category, str('count(' + other_category + ')'), \
-                            main_category, df, other_selector | main_selector, other_selector)
+    bar1 = create_bar_chart(main_category, str('count(' + main_category + ')'), main_category, df,
+                            other_selector | main_selector, main_selector)
+    bar0 = create_bar_chart(other_category, str('count(' + other_category + ')'), main_category, df,
+                            other_selector | main_selector, other_selector)
 
-    heatmap = create_heatmap('start', 'end', 'id', main_category, df, heat_map_width,
-                             heat_map_height, other_selector | main_selector, main_selector,
-                             tooltip=[
-                                 'url', main_category, other_category,
-                                 'start', 'end', 'id'
-                             ]).interactive()
+    # heatmap = create_heatmap('start', 'end', 'id', main_category, df, heat_map_width, heat_map_height,
+    #                          other_selector | main_selector, main_selector,
+    #                          tooltip=[main_category, other_category, 'start', 'end', 'id']).interactive()
+
+    heatmap = alt.Chart(df).mark_bar().encode(
+        x='start',
+        x2='end',
+        y='id',
+        href='website_url',
+        color=main_category,
+        opacity=alt.condition(other_selector | main_selector, alt.value(1), alt.value(0.2)),
+        tooltip=['website_url', main_category, other_category, 'start', 'end', 'id']
+    ).properties(
+        width=heat_map_width,
+        height=heat_map_height
+    ).add_selection(
+        main_selector
+    ).interactive()
 
     chart = alt.vconcat(
         alt.hconcat(
@@ -206,16 +239,19 @@ def plot_relationship_heatmap(df, ema_col, main_category='musical_type', other_c
 
     return chart
 
+# TODO make private
 def close_match_helper(cell):
 
     # process each cell into an interator of *floats* for easy comparisons
     if type(cell) == str:
         cell = cell.split(",")
-    
-    cell = [float(item) for item in cell]
+
+    if cell[0].isdigit():
+        cell = [int(item) for item in cell]
 
     return cell
 
+# TODO make private
 def close_match(ngrams_df, key_pattern):
     ngrams_df['pattern'] = ngrams_df['pattern'].map(lambda cell: close_match_helper(cell))
     ngrams_df['score'] = ngrams_df['pattern'].map(lambda cell: 100*textdistance.levenshtein.normalized_similarity(key_pattern, cell))
@@ -253,6 +289,34 @@ def plot_close_match_heatmap(ngrams_df, key_pattern, ngrams_duration=None, selec
     return create_heatmap('start', 'end', 'voice', 'score', score_ngrams, heatmap_width, heatmap_height,
                           alt.datum.score > selector.cutoff, selector, tooltip=[])
 
+# Network visualizations
+def process_network_df(df, melodic_interval_column_name, ema_column_name):
+    """
+    Create a small dataframe containing network
+    """
+    result_df = pd.DataFrame()
+    result_df[['piece.piece_id', 'url', melodic_interval_column_name]] = \
+        df[['piece.piece_id', 'url', melodic_interval_column_name]].copy()
+    result_df[['segments']] = \
+        df[ema_column_name].astype(str).str.split("/", 1, expand=True)[0]
+    result_df['segments'] = result_df['segments'].str.split(",")
+    return result_df
+
+# add nodes to graph
+def add_nodes_to_net(net, melodic_interval_column):
+    melodic_interval_column = melodic_interval_column.astype(str)
+    net.add_node('start', color='red', shape='circle', level=0)
+    # create nodes from the patterns
+    for node in melodic_interval_column:
+        nodes = re.sub(r'([+-])(?!$)', r'\1,', node).split(",")
+        group = nodes[0]
+        prev_node = 'start'
+
+        for i in range(1, len(nodes)):
+            node_id = "".join(node for node in nodes[:i])
+            net.add_node(node_id, group=group, physics=False, level=i)
+            net.add_edge(prev_node, node_id)
+            prev_node = node_id
 
 # create graph
 def plot_musical_type_network(df, musical_type, pieces=None):
@@ -262,7 +326,7 @@ def plot_musical_type_network(df, musical_type, pieces=None):
     return a complete network and a df with which
     the user can search through
     """
-    net = Network(directed=True, notebook=True)
+    net = Network(directed=True, notebook=True, width=700, height=1000, layout=True)
     if pieces:
         # filter df by pieces
         pass
@@ -271,41 +335,18 @@ def plot_musical_type_network(df, musical_type, pieces=None):
         result_df = process_network_df(df, 'mt_fg_int',
                                        'ema')
     else: #musical_type=='pen'
-        add_nodes_to_net(net, df['mt_pen_int'])
-        result_df = process_network_df(df, 'mt_pen_int',
+        add_nodes_to_net(net, df['mt_pe_int'])
+        result_df = process_network_df(df, 'mt_pe_int',
                                        'ema')
     return net, result_df
 
-# add nodes to graph
-def add_nodes_to_net(net, melodic_interval_column):
-    melodic_interval_column = melodic_interval_column.astype(str)
-    net.add_node('start', color='red', shape='circle')
-    # create nodes from the patterns
-    for node in melodic_interval_column:
-        nodes = re.sub(r'([+-])(?!$)', r'\1,', node).split(",")
-        group = nodes[0]
-        prev_node = 'start'
-
-        for i in range(1, len(nodes)):
-            node_id = "".join(node for node in nodes[:i])
-            net.add_node(node_id, group=group, physics=False)
-            net.add_edge(prev_node, node_id)
-            prev_node = node_id
-
-def process_network_df(df, melodic_interval_column_name, ema_column_name):
-    result_df = pd.DataFrame()
-    result_df[['piece.piece_id', 'url', melodic_interval_column_name]] = \
-        df[['piece.piece_id', 'url', melodic_interval_column_name]].copy()
-    result_df[['segments']] = \
-        df[ema_column_name].astype(str).str.split("/", 1, expand=True)[0]
-    result_df['segments'] = result_df['segments'].str.split(",")
-    return result_df
-
-def manipulate_network_df(df, search_pattern, pattern_column='mt_fg_int', search_option='starts with'):
-    if search_option == 'starts with':
-        search_pattern = '^' + search_pattern
-    elif search_option == 'ends with':
-        search_pattern = search_pattern + '$'
-    mask = df[pattern_column].apply(lambda x: x.astype(str).str.contains(pat=search_pattern, regex=True).any(), axis=1)
-    filtered_df = df[pattern_column][mask].copy()
-    return filtered_df.fillna("-").style.applymap(lambda x: "background: #ccebc5" if search_pattern in x else "")
+# # TODO rename column, add dataframe arguments, manipulation method
+# def manipulate_network_df(search_pattern, option='starts with', df):
+#     if option=='starts with':
+#         mask = df['mt_pe_int'].astype(str).str.startswith(pat=search_pattern)
+#     elif option=='ends with':
+#         mask = df['mt_pe_int'].astype(str).str.endswith(pat=search_pattern)
+#     else:
+#         mask = df['mt_pe_int'].astype(str).str.contains(pat=search_pattern, regex=False)
+#     filtered_df = df[mask].copy()
+#     return filtered_df.fillna("-").style.applymap(lambda x: "background: #ccebc5" if search_pattern in x else "")
