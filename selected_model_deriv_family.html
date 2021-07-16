@@ -1,0 +1,108 @@
+<html>
+<head>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.16.1/vis.css" type="text/css" />
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.16.1/vis-network.min.js"> </script>
+<center>
+<h1></h1>
+</center>
+
+<!-- <link rel="stylesheet" href="../node_modules/vis/dist/vis.min.css" type="text/css" />
+<script type="text/javascript" src="../node_modules/vis/dist/vis.js"> </script>-->
+
+<style type="text/css">
+
+        #mynetwork {
+            width: 500px;
+            height: 500px;
+            background-color: #ffffff;
+            border: 1px solid lightgray;
+            position: relative;
+            float: left;
+        }
+
+        
+
+        
+
+        
+</style>
+
+</head>
+
+<body>
+<div id = "mynetwork"></div>
+
+
+<script type="text/javascript">
+
+    // initialize global variables.
+    var edges;
+    var nodes;
+    var network; 
+    var container;
+    var options, data;
+
+    
+    // This method is responsible for drawing the graph, returns the drawn network
+    function drawGraph() {
+        var container = document.getElementById('mynetwork');
+        
+        
+
+        // parsing and collecting nodes and edges from the python
+        nodes = new vis.DataSet([{"id": "CRIM_Model_0002:1", "label": "CRIM_Model_0002:1", "shape": "dot"}, {"group": "Non-mechanical transformation", "id": "CRIM_Mass_0003_5:1-9,11-12", "label": "CRIM_Mass_0003_5:1-9,11-12", "shape": "dot"}, {"group": "Mechanical transformation", "id": "CRIM_Mass_0003_5:1", "label": "CRIM_Mass_0003_5:1", "shape": "dot"}, {"group": "New material", "id": "CRIM_Mass_0003_5:1-9,11-15", "label": "CRIM_Mass_0003_5:1-9,11-15", "shape": "dot"}, {"group": "New material", "id": "CRIM_Mass_0003_5:26-34", "label": "CRIM_Mass_0003_5:26-34", "shape": "dot"}, {"group": "New material", "id": "CRIM_Mass_0003_5:39-43", "label": "CRIM_Mass_0003_5:39-43", "shape": "dot"}, {"group": "New material", "id": "CRIM_Mass_0003_5:44-46", "label": "CRIM_Mass_0003_5:44-46", "shape": "dot"}, {"group": "New material", "id": "CRIM_Mass_0003_5:46-48", "label": "CRIM_Mass_0003_5:46-48", "shape": "dot"}, {"group": "New material", "id": "CRIM_Mass_0003_5:58-64", "label": "CRIM_Mass_0003_5:58-64", "shape": "dot"}, {"group": "New material", "id": "CRIM_Mass_0003_5:64-66", "label": "CRIM_Mass_0003_5:64-66", "shape": "dot"}, {"group": "New material", "id": "CRIM_Mass_0003_5:66-69", "label": "CRIM_Mass_0003_5:66-69", "shape": "dot"}, {"group": "New material", "id": "CRIM_Mass_0003_5:69-71", "label": "CRIM_Mass_0003_5:69-71", "shape": "dot"}]);
+        edges = new vis.DataSet([{"arrows": "to", "from": "CRIM_Model_0002:1", "title": "Non-mechanical transformation", "to": "CRIM_Mass_0003_5:1-9,11-12", "value": 3}, {"arrows": "to", "from": "CRIM_Model_0002:1", "title": "Mechanical transformation", "to": "CRIM_Mass_0003_5:1", "value": 2}, {"arrows": "to", "from": "CRIM_Model_0002:1", "title": "New material", "to": "CRIM_Mass_0003_5:1-9,11-15", "value": 4}, {"arrows": "to", "from": "CRIM_Model_0002:1", "title": "New material", "to": "CRIM_Mass_0003_5:26-34", "value": 4}, {"arrows": "to", "from": "CRIM_Model_0002:1", "title": "New material", "to": "CRIM_Mass_0003_5:39-43", "value": 4}, {"arrows": "to", "from": "CRIM_Model_0002:1", "title": "New material", "to": "CRIM_Mass_0003_5:44-46", "value": 4}, {"arrows": "to", "from": "CRIM_Model_0002:1", "title": "New material", "to": "CRIM_Mass_0003_5:46-48", "value": 4}, {"arrows": "to", "from": "CRIM_Model_0002:1", "title": "New material", "to": "CRIM_Mass_0003_5:58-64", "value": 4}, {"arrows": "to", "from": "CRIM_Model_0002:1", "title": "New material", "to": "CRIM_Mass_0003_5:64-66", "value": 4}, {"arrows": "to", "from": "CRIM_Model_0002:1", "title": "New material", "to": "CRIM_Mass_0003_5:66-69", "value": 4}, {"arrows": "to", "from": "CRIM_Model_0002:1", "title": "New material", "to": "CRIM_Mass_0003_5:69-71", "value": 4}]);
+
+        // adding nodes and edges to the graph
+        data = {nodes: nodes, edges: edges};
+
+        var options = {
+    "configure": {
+        "enabled": false
+    },
+    "edges": {
+        "color": {
+            "inherit": "to"
+        },
+        "smooth": {
+            "enabled": false,
+            "type": "continuous"
+        }
+    },
+    "interaction": {
+        "dragNodes": true,
+        "hideEdgesOnDrag": false,
+        "hideNodesOnDrag": false
+    },
+    "physics": {
+        "enabled": true,
+        "stabilization": {
+            "enabled": true,
+            "fit": true,
+            "iterations": 1000,
+            "onlyDynamicEdges": false,
+            "updateInterval": 50
+        }
+    }
+};
+        
+        
+
+        
+
+        network = new vis.Network(container, data, options);
+	 
+        
+
+
+        
+
+        return network;
+
+    }
+
+    drawGraph();
+
+</script>
+</body>
+</html>
